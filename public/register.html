@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Register - SASTA CCTV</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📹</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/auth.js"></script>
+</head>
+
+<body>
+  <!-- Header & Navigation -->
+  <header>
+    <div class="nav-container">
+      <a class="nav-logo" href="/">
+        <div class="logo-icon">
+          <span>S</span>
+          <div class="logo-dot"></div>
+        </div>
+        <div class="logo-text">SASTA <span>CCTV</span></div>
+      </a>
+      <nav class="nav-links" id="nav-links-container">
+        <a class="nav-link" href="/">Home</a>
+      </nav>
+      <div class="nav-actions" id="nav-actions">
+        <a class="btn btn-secondary" href="/login.html">Login</a>
+        <a class="btn btn-primary" href="/register.html">Sign Up</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="auth-wrapper">
+      <div class="auth-card">
+        <div class="auth-header">
+          <h2>Create Account</h2>
+          <p>Get started with your free security network</p>
+        </div>
+        
+        <form id="register-form">
+          <div class="form-group">
+            <label class="form-label" for="username">Username</label>
+            <input class="form-input" type="text" id="username" name="username" required autocomplete="username" placeholder="Choose a username (min 3 chars)" minlength="3">
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input class="form-input" type="password" id="password" name="password" required autocomplete="new-password" placeholder="Min 6 characters" minlength="6">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="confirm-password">Confirm Password</label>
+            <input class="form-input" type="password" id="confirm-password" name="confirm-password" required autocomplete="new-password" placeholder="Confirm your password" minlength="6">
+          </div>
+
+          <div class="form-feedback error" id="feedback-error"></div>
+          <div class="form-feedback success" id="feedback-success"></div>
+          
+          <button class="btn btn-primary" type="submit" style="width: 100%; margin-top: 1.5rem; height: 44px;">Sign Up</button>
+        </form>
+
+        <div class="auth-footer">
+          Already have an account? <a href="/login.html">Sign In</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    redirectIfLoggedIn();
+
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirm-password').value;
+      const errEl = document.getElementById('feedback-error');
+      const succEl = document.getElementById('feedback-success');
+
+      errEl.style.display = 'none';
+      succEl.style.display = 'none';
+
+      if (password !== confirmPassword) {
+        errEl.innerText = 'Passwords do not match.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          succEl.innerText = 'Registration successful! Redirecting...';
+          succEl.style.display = 'block';
+          
+          try {
+            const countRes = await fetch('/api/devices/active-cameras');
+            const countData = await countRes.json();
+            const target = countData.count === 0 ? '/camera.html?autostart=true' : '/monitor.html';
+            setTimeout(() => {
+              window.location.href = target;
+            }, 1000);
+          } catch (err) {
+            setTimeout(() => {
+              window.location.href = '/camera.html?autostart=true';
+            }, 1000);
+          }
+        } else {
+          errEl.innerText = data.error || 'Registration failed. Try a different username.';
+          errEl.style.display = 'block';
+        }
+      } catch (err) {
+        errEl.innerText = 'Network error, please try again.';
+        errEl.style.display = 'block';
+        console.error('Registration error:', err);
+      }
+    });
+  </script>
+</body>
+</html>

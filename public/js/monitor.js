@@ -1,0 +1,497 @@
+// Monitor Dashboard Logic - SASTA CCTV
+
+let socket;
+let userId = null;
+let activeCameraSocketId = null;
+let activeCameraName = null;
+let peerConnection = null;
+let userNavigatedBack = false;
+
+// Audio variables for Walkie Talkie mic
+let micStream = null;
+let micTrack = null;
+
+// List of alerts cache
+let alertsCache = [];
+let activeAlert = null; // Currently opened in modal
+
+// Web Audio API for Notification chimes
+let notifyCtx = null;
+
+async function init() {
+  const session = await protectPage();
+  if (session && session.loggedIn) {
+    userId = session.user.id;
+  }
+
+  // Load existing alert logs
+  fetchAlertLogs();
+  
+  setupDOMListeners();
+  setupTimeCounter();
+  connectSocket();
+}
+
+function setupDOMListeners() {
+  document.getElementById('btn-back-to-list').addEventListener('click', backToCameraList);
+  document.getElementById('btn-modal-close').addEventListener('click', closeAlertModal);
+  document.getElementById('btn-modal-delete').addEventListener('click', deleteActiveAlert);
+  
+  // Close modal when clicking outside content
+  window.addEventListener('click', (e) => {
+    const modal = document.getElementById('snapshot-modal');
+    if (e.target === modal) {
+      closeAlertModal();
+    }
+  });
+
+  // Digital Zoom range slider
+  const zoomSlider = document.getElementById('control-zoom');
+  const zoomText = document.getElementById('zoom-val');
+  const videoEl = document.getElementById('remote-video');
+  zoomSlider.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    zoomText.innerText = `${val}x`;
+    if (videoEl) {
+      videoEl.style.transform = `scale(${val})`;
+    }
+  });
+
+  // Night Vision checkbox toggle
+  const nvCheckbox = document.getElementById('control-nightvision');
+  nvCheckbox.addEventListener('change', (e) => {
+    if (videoEl) {
+      if (e.target.checked) {
+        videoEl.classList.add('night-vision-mode');
+      } else {
+        videoEl.classList.remove('night-vision-mode');
+      }
+    }
+  });
+
+  // Siren toggle control
+  const sirenCheckbox = document.getElementById('control-siren');
+  sirenCheckbox.addEventListener('change', (e) => {
+    if (!activeCameraSocketId) return;
+    const action = e.target.checked ? 'start' : 'stop';
+    socket.emit('trigger-siren', {
+      targetSocketId: activeCameraSocketId,
+      action
+    });
+  });
+
+  // Push to Talk (Walkie-Talkie) microphone trigger
+  const pttButton = document.getElementById('btn-ptt');
+  
+  // Mouse down / Touch start
+  const startTalking = (e) => {
+    e.preventDefault();
+    if (!micTrack) {
+      console.warn('Microphone track is not active or authorized.');
+      return;
+    }
+    pttButton.classList.add('active');
+    micTrack.enabled = true; // Unmute mic track
+    console.log('PTT: Microphone unmuted');
+  };
+
+  // Mouse up / Touch end / Mouse leave
+  const stopTalking = (e) => {
+    e.preventDefault();
+    if (pttButton.classList.contains('active')) {
+      pttButton.classList.remove('active');
+      if (micTrack) {
+        micTrack.enabled = false; // Mute mic track
+      }
+      console.log('PTT: Microphone muted');
+    }
+  };
+
+  pttButton.addEventListener('mousedown', startTalking);
+  pttButton.addEventListener('touchstart', startTalking, { passive: false });
+  pttButton.addEventListener('mouseup', stopTalking);
+  pttButton.addEventListener('touchend', stopTalking, { passive: false });
+  pttButton.addEventListener('mouseleave', stopTalking);
+}
+
+function setupTimeCounter() {
+  setInterval(() => {
+    const now = new Date();
+    const timeStr = now.toISOString().replace('T', ' ').substring(0, 19);
+    const el = document.getElementById('monitor-time');
+    if (el) el.innerText = timeStr;
+  }, 1000);
+}
+
+// Socket IO Setup
+function connectSocket() {
+  socket = io();
+
+  socket.on('connect', () => {
+    console.log('Connected to signaling server');
+    socket.emit('register-device', {
+      type: 'monitor',
+      userId
+    });
+  });
+
+  // Camera devices update in workspace
+  socket.on('camera-list-update', (cameras) => {
+    renderCameraSelectionGrid(cameras);
+  });
+
+  // Signal feedback from camera
+  socket.on('webrtc-signal', async ({ senderSocketId, signalData }) => {
+    if (senderSocketId !== activeCameraSocketId) return;
+
+    try {
+      if (signalData.answer) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(signalData.answer));
+        console.log('WebRTC connection established with camera answer');
+      } else if (signalData.candidate) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(signalData.candidate));
+      }
+    } catch (err) {
+      console.error('Failed to process incoming WebRTC signal:', err);
+    }
+  });
+
+  // Siren alert status sync
+  socket.on('trigger-siren', ({ action }) => {
+    const sirenCheckbox = document.getElementById('control-siren');
+    if (sirenCheckbox) {
+      sirenCheckbox.checked = (action === 'start');
+    }
+  });
+
+  // Real-time Motion Alert logger
+  socket.on('motion-alert', (alert) => {
+    // Add alert to top of feed list
+    alertsCache.unshift(alert);
+    renderAlertList();
+    
+    // Highlight list item and play visual warning if alert is for the active viewed camera
+    if (activeCameraName && alert.cameraName === activeCameraName) {
+      playAlertNotification();
+    } else {
+      // Just play warning chime anyway
+      playAlertNotification();
+    }
+  });
+}
+
+// Plays a premium dual-tone chime notification on motion
+function playAlertNotification() {
+  try {
+    if (!notifyCtx) {
+      notifyCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    const now = notifyCtx.currentTime;
+    
+    // Note 1: C5 (523 Hz)
+    const osc1 = notifyCtx.createOscillator();
+    const gain1 = notifyCtx.createGain();
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(523, now);
+    gain1.gain.setValueAtTime(0.3, now);
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    osc1.connect(gain1);
+    gain1.connect(notifyCtx.destination);
+    
+    // Note 2: E5 (659 Hz)
+    const osc2 = notifyCtx.createOscillator();
+    const gain2 = notifyCtx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(659, now + 0.1);
+    gain2.gain.setValueAtTime(0.3, now + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    osc2.connect(gain2);
+    gain2.connect(notifyCtx.destination);
+
+    osc1.start(now);
+    osc1.stop(now + 0.2);
+    
+    osc2.start(now + 0.1);
+    osc2.stop(now + 0.35);
+  } catch (err) {
+    console.error('Audio chime playback failed:', err);
+  }
+}
+
+// Populate grid with online cameras
+function renderCameraSelectionGrid(cameras) {
+  const container = document.getElementById('camera-list-container');
+  if (!container) return;
+
+  if (cameras.length === 0) {
+    userNavigatedBack = false; // Reset block since all cameras went offline
+    container.innerHTML = `
+      <div style="grid-column: span 3; text-align: center; padding: 3rem; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.6;">📹</div>
+        <h4 style="margin-bottom: 0.5rem;">No Cameras Online</h4>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; max-width: 420px; margin: 0 auto 1.5rem auto;">To start monitoring, open SASTA CCTV on another phone or computer, name the camera, and click **Start Camera**.</p>
+        <a href="/camera.html" target="_blank" class="btn btn-glass">Open Camera Console</a>
+      </div>
+    `;
+    // If active camera went offline, return to list view
+    if (activeCameraSocketId) {
+      backToCameraList();
+    }
+    return;
+  }
+
+  // Auto-connect if there is exactly 1 camera online and we haven't manually backed out
+  if (cameras.length === 1 && activeCameraSocketId === null && !userNavigatedBack) {
+    initiateStreaming(cameras[0].socketId, cameras[0].cameraName);
+    return;
+  }
+
+  container.innerHTML = '';
+  cameras.forEach(cam => {
+    const card = document.createElement('div');
+    card.className = 'camera-card';
+    card.innerHTML = `
+      <div class="camera-card-icon">📹</div>
+      <div class="camera-card-name">${cam.cameraName}</div>
+      <div style="font-size: 0.75rem; color: var(--accent-neon);">● ACTIVE</div>
+    `;
+    card.addEventListener('click', () => initiateStreaming(cam.socketId, cam.cameraName));
+    container.appendChild(card);
+  });
+}
+
+// Initiate peer collection & stream setup
+async function initiateStreaming(socketId, name) {
+  activeCameraSocketId = socketId;
+  activeCameraName = name;
+
+  // Swap view states
+  document.getElementById('camera-selection-view').style.display = 'none';
+  document.getElementById('monitor-portal-view').style.display = 'grid';
+  document.getElementById('active-camera-title').innerText = name;
+
+  // Reset controls UI
+  document.getElementById('control-zoom').value = 1;
+  document.getElementById('zoom-val').innerText = '1x';
+  document.getElementById('control-nightvision').checked = false;
+  document.getElementById('control-siren').checked = false;
+  
+  const videoEl = document.getElementById('remote-video');
+  videoEl.classList.remove('night-vision-mode');
+  videoEl.style.transform = 'scale(1)';
+
+  // Setup local audio track for PTT (Walkie-Talkie)
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micTrack = micStream.getAudioTracks()[0];
+    micTrack.enabled = false; // Muted by default
+  } catch (err) {
+    console.warn('Microphone permission denied. Walkie-Talkie feature disabled:', err);
+    micTrack = null;
+  }
+
+  // Create Peer Connection
+  peerConnection = new RTCPeerConnection({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  });
+
+  // Attach Microphone track if available
+  if (micTrack && micStream) {
+    peerConnection.addTrack(micTrack, micStream);
+  }
+
+  // Gather ICE candidates
+  peerConnection.onicecandidate = (event) => {
+    if (event.candidate && socket) {
+      socket.emit('webrtc-signal', {
+        targetSocketId: activeCameraSocketId,
+        signalData: { candidate: event.candidate }
+      });
+    }
+  };
+
+  // Receive tracks from camera
+  peerConnection.ontrack = (event) => {
+    console.log('Received track from camera:', event.track.kind);
+    if (event.track.kind === 'video') {
+      videoEl.srcObject = event.streams[0];
+    }
+  };
+
+  peerConnection.oniceconnectionstatechange = () => {
+    console.log(`ICE Connection State: ${peerConnection.iceConnectionState}`);
+    if (peerConnection.iceConnectionState === 'disconnected' || peerConnection.iceConnectionState === 'closed') {
+      console.log('Camera disconnected');
+      backToCameraList();
+    }
+  };
+
+  // Create Offer
+  try {
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    
+    socket.emit('webrtc-signal', {
+      targetSocketId: activeCameraSocketId,
+      signalData: { offer }
+    });
+  } catch (err) {
+    console.error('Failed to negotiate WebRTC offer:', err);
+  }
+}
+
+function backToCameraList() {
+  activeCameraSocketId = null;
+  activeCameraName = null;
+  userNavigatedBack = true; // Block auto-connecting until reset
+
+  // Stop video element
+  const videoEl = document.getElementById('remote-video');
+  if (videoEl) videoEl.srcObject = null;
+
+  // Clean WebRTC
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+
+  // Clean Microphone stream
+  if (micStream) {
+    micStream.getTracks().forEach(track => track.stop());
+    micStream = null;
+    micTrack = null;
+  }
+
+  // Swap view states
+  document.getElementById('monitor-portal-view').style.display = 'none';
+  document.getElementById('camera-selection-view').style.display = 'block';
+}
+
+// Fetch historical alert logs from database
+async function fetchAlertLogs() {
+  try {
+    const res = await fetch('/api/alerts');
+    const data = await res.json();
+    if (res.ok) {
+      alertsCache = data.alerts;
+      renderAlertList();
+    }
+  } catch (err) {
+    console.error('Failed to retrieve alert logs:', err);
+  }
+}
+
+function renderAlertList() {
+  const list = document.getElementById('alerts-list');
+  const countEl = document.getElementById('alerts-count');
+  const emptyState = document.getElementById('alerts-empty-state');
+  if (!list) return;
+
+  if (alertsCache.length === 0) {
+    emptyState.style.display = 'block';
+    countEl.innerText = '0 logs';
+    // Clear other list elements
+    const alertsElements = list.querySelectorAll('.alert-item');
+    alertsElements.forEach(el => el.remove());
+    return;
+  }
+
+  emptyState.style.display = 'none';
+  countEl.innerText = `${alertsCache.length} log${alertsCache.length > 1 ? 's' : ''}`;
+
+  // Clear existing items but preserve empty state structure
+  const currentItems = list.querySelectorAll('.alert-item');
+  currentItems.forEach(el => el.remove());
+
+  alertsCache.forEach((alert, idx) => {
+    const item = document.createElement('div');
+    // Highlight first item if it was just loaded via socket (timestamp check/index 0)
+    item.className = 'alert-item';
+    
+    // Check if alert timestamp is less than 5 seconds old (fresh real-time trigger)
+    const ageMs = Date.now() - new Date(alert.timestamp).getTime();
+    if (ageMs < 5000) {
+      item.classList.add('new-alert');
+    }
+
+    const date = new Date(alert.timestamp);
+    const dateStr = date.toLocaleTimeString() + ' - ' + date.toLocaleDateString();
+
+    item.innerHTML = `
+      <div class="alert-thumbnail">
+        <img src="${alert.imagePath || 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22 style=%22background:%23000;%22><text y=%22.9em%22 font-size=%2280%22 fill=%22red%22>⚠️</text></svg>'}" alt="Alert Thumbnail">
+      </div>
+      <div class="alert-info">
+        <span class="alert-camera">${alert.cameraName}</span>
+        <span class="alert-time">${dateStr}</span>
+      </div>
+      <button class="alert-delete-btn" title="Delete event">&times;</button>
+    `;
+
+    // Click handler to open screenshot modal
+    item.addEventListener('click', (e) => {
+      // Don't open modal if click is on delete button
+      if (e.target.classList.contains('alert-delete-btn')) {
+        e.stopPropagation();
+        deleteAlertItem(alert.id);
+        return;
+      }
+      openAlertModal(alert);
+    });
+
+    list.appendChild(item);
+  });
+}
+
+function openAlertModal(alert) {
+  activeAlert = alert;
+  
+  document.getElementById('modal-camera-name').innerText = alert.cameraName;
+  document.getElementById('modal-image').src = alert.imagePath;
+  
+  const date = new Date(alert.timestamp);
+  document.getElementById('modal-timestamp').innerText = date.toLocaleString();
+  
+  document.getElementById('snapshot-modal').style.display = 'flex';
+}
+
+function closeAlertModal() {
+  document.getElementById('snapshot-modal').style.display = 'none';
+  activeAlert = null;
+}
+
+// Delete alert trigger from modal
+async function deleteActiveAlert() {
+  if (!activeAlert) return;
+  await deleteAlertItem(activeAlert.id);
+  closeAlertModal();
+}
+
+// Delete helper call
+async function deleteAlertItem(id) {
+  try {
+    const res = await fetch(`/api/alerts/${id}`, {
+      method: 'DELETE'
+    });
+    
+    if (res.ok) {
+      alertsCache = alertsCache.filter(a => a.id !== id);
+      renderAlertList();
+      console.log(`Alert log ID ${id} deleted.`);
+    }
+  } catch (err) {
+    console.error('Failed to delete alert log:', err);
+  }
+}
+
+// Initialise on load
+document.addEventListener('DOMContentLoaded', init);
+window.addEventListener('beforeunload', () => {
+  if (peerConnection) {
+    peerConnection.close();
+  }
+});
