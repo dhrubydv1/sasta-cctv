@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SASTA CCTV - Turn Old Phones into Security Cameras</title>
+  <meta name="description" content="SASTA CCTV is a DIY security camera system. Turn your old smartphones or laptops into a free home surveillance system with motion detection, night vision, and live WebRTC streaming.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📹</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/auth.js"></script>
+</head>
+
+<body>
+  <!-- Header & Navigation -->
+  <header>
+    <div class="nav-container">
+      <a class="nav-logo" href="/">
+        <div class="logo-icon">
+          <span>S</span>
+          <div class="logo-dot"></div>
+        </div>
+        <div class="logo-text">SASTA <span>CCTV</span></div>
+      </a>
+      <nav class="nav-links" id="nav-links-container">
+        <a class="nav-link active" id="link-home" href="/">Home</a>
+        <a class="nav-link" id="link-monitor" href="/monitor.html">Web Monitor</a>
+      </nav>
+      <div class="nav-actions" id="nav-actions">
+        <!-- Managed dynamically by auth.js -->
+        <a class="btn btn-secondary" href="/login.html">Login</a>
+        <a class="btn btn-primary" href="/register.html">Sign Up</a>
+      </div>
+    </div>
+  </header>
+
+  <main role="main">
+    <div class="container">
+      
+      <!-- HERO SECTION -->
+      <section class="hero">
+        <div class="hero-content">
+          <div class="hero-subtitle">
+            <div class="hero-subtitle-dot"></div>
+            Smart DIY Home Security
+          </div>
+          <h1 class="hero-title">Turn your old phone into a <span>Security Camera</span>.</h1>
+          <p class="hero-desc">
+            Don't throw away your old smartphones! SASTA CCTV lets you repurpose any unused Android, iOS, or laptop device into a fully featured home security camera. Watch live streams from anywhere, receive instant motion detection alerts, and stay connected with two-way audio — all completely FREE.
+          </p>
+          <div class="hero-actions">
+            <a href="/monitor.html" class="btn btn-primary">Go to Web Monitor</a>
+            <a href="/camera.html" class="btn btn-glass">Open Camera Console</a>
+          </div>
+        </div>
+        
+        <div class="hero-graphic-container">
+          <!-- Animated Demo Screen showing Motion Detection -->
+          <div class="hero-card">
+            <div class="hero-card-header">
+              <div class="hero-card-title">
+                <span style="color: var(--accent-neon); font-size: 0.8rem;">●</span> LIVE — Living Room Camera
+              </div>
+              <span style="font-size: 0.75rem; color: var(--text-secondary);">1080p 30fps</span>
+            </div>
+            
+            <div class="hero-camera-feed">
+              <!-- Inline SVG placeholder that looks premium -->
+              <svg width="100%" height="100%" viewBox="0 0 400 250" style="background:#09101d; display:block;">
+                <!-- Room outline -->
+                <line x1="20" y1="200" x2="380" y2="200" stroke="#1f2d3d" stroke-width="2" />
+                <line x1="80" y1="200" x2="80" y2="80" stroke="#1f2d3d" stroke-width="2" />
+                <line x1="320" y1="200" x2="320" y2="80" stroke="#1f2d3d" stroke-width="2" />
+                <!-- Sofa / Couch silhouette -->
+                <path d="M 120,200 L 120,160 Q 120,150 130,150 L 270,150 Q 280,150 280,160 L 280,200 Z" fill="#152136" />
+                <path d="M 100,200 L 100,170 Q 100,160 110,160 L 120,160 L 120,200 Z" fill="#1c2c47" />
+                <path d="M 300,200 L 300,170 Q 300,160 290,160 L 280,160 L 280,200 Z" fill="#1c2c47" />
+                <!-- Window silhouette -->
+                <rect x="150" y="50" width="100" height="60" fill="#0d1b2e" stroke="#1f2d3d" stroke-width="1.5" />
+                <line x1="200" y1="50" x2="200" y2="110" stroke="#1f2d3d" stroke-width="1" />
+                <line x1="150" y1="80" x2="250" y2="80" stroke="#1f2d3d" stroke-width="1" />
+                <!-- Intruder / Pet Silhouette walking -->
+                <circle cx="210" cy="145" r="14" fill="#39ff14" opacity="0.1" /> <!-- Motion hint -->
+                <path d="M 190,185 Q 192,150 205,150 Q 212,152 215,160 L 220,185 Z" fill="#39ff14" opacity="0.3" />
+                <circle cx="208" cy="140" r="6" fill="#39ff14" opacity="0.4" />
+              </svg>
+              <div class="overlay-scanline"></div>
+              <div class="overlay-timestamp" id="hero-time">2026-06-14 21:28:00</div>
+              <div class="overlay-rec">
+                <div class="rec-dot"></div>
+                REC
+              </div>
+              <div class="overlay-target"></div>
+              <div class="overlay-motion-tag">
+                ⚠️ MOTION DETECTED
+              </div>
+              <div class="motion-border" style="top: 48%; left: 45%; width: 14%; height: 26%;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- METRICS INFO -->
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-around; gap: 2rem; padding: 2rem 0; margin-bottom: 2rem; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+        <div style="text-align: center;">
+          <h3 style="color: var(--accent-neon); font-size: 2.2rem;">2019</h3>
+          <p style="color: var(--text-secondary); font-size: 0.9rem;">Serving users since 2019</p>
+        </div>
+        <div style="text-align: center;">
+          <h3 style="color: var(--accent-cyan); font-size: 2.2rem;">1M+</h3>
+          <p style="color: var(--text-secondary); font-size: 0.9rem;">Active camera streams globally</p>
+        </div>
+        <div style="text-align: center;">
+          <h3 style="color: var(--accent-neon); font-size: 2.2rem;">0 ₹</h3>
+          <p style="color: var(--text-secondary); font-size: 0.9rem;">100% Free Including All Features</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- HOW IT WORKS -->
+    <section class="how-it-works">
+      <div class="container">
+        <div class="section-header">
+          <h2>How It Works</h2>
+          <p>Setting up your SASTA CCTV security network takes less than two minutes. All you need are two devices connected to the internet.</p>
+        </div>
+        
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-num">1</div>
+            <h3 class="step-title">Create Account</h3>
+            <p class="step-desc">Register a secure account. Use this account to link all cameras and monitors together safely.</p>
+          </div>
+          <div class="step-item">
+            <div class="step-num">2</div>
+            <h3 class="step-title">Deploy Cameras</h3>
+            <p class="step-desc">Open SASTA CCTV on your old device (phone or laptop), choose **Camera Console**, and position the device.</p>
+          </div>
+          <div class="step-item">
+            <div class="step-num">3</div>
+            <h3 class="step-title">Watch Live</h3>
+            <p class="step-desc">Open the **Web Monitor** on your primary phone or PC to watch live feeds and receive real-time motion alerts.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+      
+      <!-- FEATURES SECTION -->
+      <section style="padding: 4rem 0 2rem 0;">
+        <div class="section-header">
+          <h2>Features Tailored for Safety</h2>
+          <p>Get premium, military-grade security camera features on hardware you already own, completely free.</p>
+        </div>
+        
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">🎥</div>
+            <h3>WebRTC Live Stream</h3>
+            <p>Direct peer-to-peer connection for zero-latency audio and HD video from anywhere in the world.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">🏃</div>
+            <h3>Intelligent Motion Alerts</h3>
+            <p>Smart canvas pixel analysis monitors movements, outlines targets, captures snapshots, and pushes warnings to your dashboard.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">🎙️</div>
+            <h3>Walkie-Talkie</h3>
+            <p>Hold down the talk button on your monitor to speak directly through the speaker of your remote camera device.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">🌙</div>
+            <h3>Digital Night Vision</h3>
+            <p>Advanced real-time contrast and green-channel amplification filter allows you to monitor dim rooms clearly.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">🚨</div>
+            <h3>Remote Siren Alarm</h3>
+            <p>Spot suspicious activity? Trigger a high-decibel alarm siren remotely on the camera to ward off intruders.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">🔎</div>
+            <h3>Digital Zoom</h3>
+            <p>Smooth pan-and-zoom controls on the viewer console let you inspect specific parts of the layout closely.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-content">
+      <div>&copy; 2026 SASTA CCTV. Built with style and utility.</div>
+      <div class="footer-links">
+        <a href="#" class="footer-link">Privacy Policy</a>
+        <a href="#" class="footer-link">Terms of Service</a>
+        <a href="#" class="footer-link">Contact Support</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Live update hero mock timestamp
+    function updateHeroTime() {
+      const now = new Date();
+      const format = now.toISOString().replace('T', ' ').substring(0, 19);
+      const el = document.getElementById('hero-time');
+      if (el) el.innerText = format;
+    }
+    setInterval(updateHeroTime, 1000);
+    updateHeroTime();
+  </script>
+</body>
+</html>

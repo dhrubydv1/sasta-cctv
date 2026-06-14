@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Camera Console - SASTA CCTV</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📹</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/auth.js"></script>
+</head>
+
+<body>
+  <!-- Header & Navigation -->
+  <header>
+    <div class="nav-container">
+      <a class="nav-logo" href="/">
+        <div class="logo-icon">
+          <span>S</span>
+          <div class="logo-dot"></div>
+        </div>
+        <div class="logo-text">SASTA <span>CCTV</span></div>
+      </a>
+      <nav class="nav-links" id="nav-links-container">
+        <!-- Managed dynamically -->
+      </nav>
+      <div class="nav-actions" id="nav-actions">
+        <!-- Managed dynamically -->
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <div class="portal-layout">
+        
+        <!-- Stream/Preview Panel -->
+        <div class="stream-card">
+          <div class="stream-title-bar">
+            <div>
+              <h2 id="camera-heading">Camera Console</h2>
+              <p style="color: var(--text-secondary); font-size: 0.9rem;">Turn this device into an active surveillance camera</p>
+            </div>
+            <div class="stream-status">
+              <div class="status-indicator" id="camera-status-dot"></div>
+              <span id="camera-status-text">OFFLINE</span>
+            </div>
+          </div>
+
+          <div class="video-container">
+            <video class="video-element" id="webcam-preview" autoplay playsinline muted></video>
+            <canvas class="motion-canvas" id="motion-canvas"></canvas>
+            
+            <div class="overlay-scanline"></div>
+            <div class="overlay-timestamp" id="stream-time">--:--:--</div>
+            <div class="overlay-rec" id="rec-indicator" style="display: none;">
+              <div class="rec-dot"></div>
+              STREAMING
+            </div>
+            
+            <div class="overlay-motion-tag" id="motion-warning" style="display: none; background: rgba(255, 59, 48, 0.9); z-index: 10;">
+              ⚠️ MOTION DETECTED
+            </div>
+          </div>
+
+          <div class="controls-grid">
+            <div class="control-card" style="grid-column: span 2;">
+              <div class="control-header">
+                <span>Camera Device Configuration</span>
+              </div>
+              <div style="display: flex; gap: 1rem; align-items: flex-end; width: 100%;">
+                <div style="flex: 1;">
+                  <label class="form-label" for="camera-name">Camera Name</label>
+                  <input class="form-input" type="text" id="camera-name" value="Living Room Camera">
+                </div>
+                <button class="btn btn-primary" id="btn-start" style="height: 42px;">Start Camera</button>
+                <button class="btn btn-danger" id="btn-stop" style="height: 42px; display: none;">Stop Camera</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Camera Sidebar Controls -->
+        <div class="alerts-sidebar">
+          <div class="sidebar-title">
+            <span>Camera Settings</span>
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1rem;">
+            
+            <div class="control-card">
+              <div class="switch-container">
+                <div>
+                  <h4 style="font-size: 0.95rem; font-weight: 600;">Motion Detection</h4>
+                  <p style="color: var(--text-secondary); font-size: 0.75rem;">Enable on-device activity scans</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="toggle-motion" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+              
+              <div class="slider-container" style="margin-top: 0.5rem;">
+                <div class="control-header">
+                  <span style="font-size: 0.8rem;">Sensitivity</span>
+                  <span class="slider-val" id="sensitivity-val">High</span>
+                </div>
+                <input type="range" id="motion-sensitivity" min="10" max="80" value="30">
+              </div>
+            </div>
+
+            <div class="control-card">
+              <div class="switch-container">
+                <div>
+                  <h4 style="font-size: 0.95rem; font-weight: 600;">Auto Siren</h4>
+                  <p style="color: var(--text-secondary); font-size: 0.75rem;">Trigger local alarm on motion</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="toggle-auto-siren">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="control-card" style="border-color: rgba(255, 59, 48, 0.2); background: rgba(255, 59, 48, 0.02);" id="local-siren-card">
+              <h4 style="font-size: 0.95rem; font-weight: 600; color: #ff8e88;">Local Siren Alarm</h4>
+              <p style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.75rem;">Sirens can be triggered remotely by monitor clients.</p>
+              <button class="btn btn-danger" id="btn-kill-siren" style="display: none; width: 100%;">Silence Alarm</button>
+            </div>
+            
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-content">
+      <div>&copy; 2026 SASTA CCTV. Built with style and utility.</div>
+    </div>
+  </footer>
+
+  <script src="/js/camera.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+{
+  "users": [
+    {
+      "id": "1781452990519z22az",
+      "username": "tester1",
+      "passwordHash": "$2b$10$U1oREd7ukGCORzQY70BO2.Z4XB9KVa1q5G/UUOtUL5Dlgn5Q6P5ji"
+    },
+    {
+      "id": "1781453166328psnl3",
+      "username": "adminpanel",
+      "passwordHash": "$2b$10$7SRW7ATq8mtD3qUMyDi8Tu5uzyWDjV28Buh3X/0BBk5/6g3cfp2RW"
+    },
+    {
+      "id": "1781454923019xkhhw",
+      "username": "autotest98231",
+      "passwordHash": "$2b$10$lZItraVZgvlqE.W4dHdEZeODYsjeiuoSAKXi/y/XmFlyaePlXRjMG"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "1781454289062as8zp",
+      "userId": "1781453166328psnl3",
+      "cameraName": "adminpanel's PC Camera",
+      "timestamp": "2026-06-14T16:24:49.064Z",
+      "imagePath": "/uploads/alerts/alert_1781453166328psnl3_1781454289062as8zp.jpeg"
+    },
+    {
+      "id": "1781454305024gbff6",
+      "userId": "1781453166328psnl3",
+      "cameraName": "adminpanel's PC Camera",
+      "timestamp": "2026-06-14T16:25:05.026Z",
+      "imagePath": "/uploads/alerts/alert_1781453166328psnl3_1781454305024gbff6.jpeg"
+    },
+    {
+      "id": "1781454563622mq1bo",
+      "userId": "1781453166328psnl3",
+      "cameraName": "adminpanel's PC Camera",
+      "timestamp": "2026-06-14T16:29:23.623Z",
+      "imagePath": "/uploads/alerts/alert_1781453166328psnl3_1781454563622mq1bo.jpeg"
+    },
+    {
+      "id": "1781454893004n6ejt",
+      "userId": "1781453166328psnl3",
+      "cameraName": "adminpanel's PC Camera",
+      "timestamp": "2026-06-14T16:34:53.007Z",
+      "imagePath": "/uploads/alerts/alert_1781453166328psnl3_1781454893004n6ejt.jpeg"
+    },
+    {
+      "id": "1781455015229wh8cf",
+      "userId": "1781453166328psnl3",
+      "cameraName": "adminpanel's PC Camera",
+      "timestamp": "2026-06-14T16:36:55.230Z",
+      "imagePath": "/uploads/alerts/alert_1781453166328psnl3_1781455015229wh8cf.jpeg"
+    },
+    {
+      "id": "17814550370042neko",
+      "userId": "1781453166328psnl3",
+      "cameraName": "adminpanel's PC Camera",
+      "timestamp": "2026-06-14T16:37:17.006Z",
+      "imagePath": "/uploads/alerts/alert_1781453166328psnl3_17814550370042neko.jpeg"
+    }
+  ]
+}
