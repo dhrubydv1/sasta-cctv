@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Web Monitor Dashboard - SASTA CCTV</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📹</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/auth.js"></script>
+</head>
+
+<body>
+  <!-- Header & Navigation -->
+  <header>
+    <div class="nav-container">
+      <a class="nav-logo" href="/">
+        <div class="logo-icon">
+          <span>S</span>
+          <div class="logo-dot"></div>
+        </div>
+        <div class="logo-text">SASTA <span>CCTV</span></div>
+      </a>
+      <nav class="nav-links" id="nav-links-container">
+        <!-- Managed dynamically -->
+      </nav>
+      <div class="nav-actions" id="nav-actions">
+        <!-- Managed dynamically -->
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      
+      <!-- Camera Selection Mode (when no camera is actively viewed) -->
+      <div id="camera-selection-view" style="margin-bottom: 2rem;">
+        <h2 style="font-family: var(--font-display); font-size: 1.8rem; margin-bottom: 0.5rem;">Select Active Camera</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">Choose a connected device below to start monitoring in real-time</p>
+        
+        <div id="camera-list-container" class="camera-selection-grid">
+          <!-- Populated dynamically with active cameras -->
+          <div style="grid-column: span 3; text-align: center; padding: 3rem; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+            <div style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.6;">📹</div>
+            <h4 style="margin-bottom: 0.5rem;">No Cameras Online</h4>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; max-width: 420px; margin: 0 auto 1.5rem auto;">To start monitoring, open SASTA CCTV on another phone or computer, name the camera, and click **Start Camera**.</p>
+            <a href="/camera.html" target="_blank" class="btn btn-glass">Open Camera Console</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Monitoring Layout (hidden by default) -->
+      <div id="monitor-portal-view" class="portal-layout" style="display: none;">
+        
+        <!-- Live stream console -->
+        <div class="stream-card">
+          <div class="stream-title-bar">
+            <div>
+              <button class="btn btn-secondary" id="btn-back-to-list" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; margin-bottom: 0.5rem; display: inline-flex; align-items: center; gap: 0.3rem;">
+                ← Back to List
+              </button>
+              <h2 id="active-camera-title">Living Room Camera</h2>
+            </div>
+            <div class="stream-status">
+              <div class="status-indicator streaming"></div>
+              <span>LIVE</span>
+            </div>
+          </div>
+
+          <div class="video-container">
+            <!-- Dynamic styling hook for filters and zoom -->
+            <div id="video-wrapper" style="width:100%; height:100%; overflow:hidden; border-radius: inherit;">
+              <video class="video-element" id="remote-video" autoplay playsinline></video>
+            </div>
+            <div class="overlay-scanline"></div>
+            <div class="overlay-timestamp" id="monitor-time">--:--:--</div>
+            <div class="overlay-rec">
+              <div class="rec-dot"></div>
+              MONITORING
+            </div>
+          </div>
+
+          <!-- Dash Control panel -->
+          <div class="controls-grid">
+            <div class="control-card">
+              <div class="control-header">
+                <span>Digital Zoom</span>
+                <span class="slider-val" id="zoom-val">1x</span>
+              </div>
+              <div class="slider-container">
+                <input type="range" id="control-zoom" min="1" max="4" step="0.1" value="1">
+              </div>
+            </div>
+
+            <div class="control-card">
+              <div class="switch-container">
+                <div>
+                  <h4 style="font-size: 0.95rem; font-weight: 600;">Night Vision</h4>
+                  <p style="color: var(--text-muted); font-size: 0.75rem;">Digital image enhancer</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="control-nightvision">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="control-card" style="border-color: rgba(255, 59, 48, 0.25);">
+              <div class="switch-container">
+                <div>
+                  <h4 style="font-size: 0.95rem; font-weight: 600; color: #ff8e88;">Trigger Siren</h4>
+                  <p style="color: var(--text-muted); font-size: 0.75rem;">Play local alarm on camera</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="control-siren">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="control-card">
+              <button class="ptt-btn" id="btn-ptt">
+                <div class="ptt-pulse"></div>
+                <span style="font-size: 1.1rem;">🎤 TALK</span>
+                <span style="font-size: 0.7rem; opacity: 0.8; font-weight: 400;">Hold to talk (Walkie-Talkie)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar alerts logs -->
+        <div class="alerts-sidebar">
+          <div class="sidebar-title">
+            <span>Recent Motion Logs</span>
+            <span class="sidebar-count" id="alerts-count">0 logs</span>
+          </div>
+          
+          <div class="alerts-list" id="alerts-list">
+            <!-- Alert log cards will populate dynamically -->
+            <div style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 2rem 0;" id="alerts-empty-state">
+              No motion events captured yet.
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Snapshot Viewer Modal -->
+  <div class="modal" id="snapshot-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-camera-name" style="font-size: 1.25rem;">Camera Event</h3>
+        <button class="modal-close" id="btn-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <img src="" id="modal-image" class="modal-img" alt="Captured snapshot">
+      </div>
+      <div class="modal-footer">
+        <span id="modal-timestamp" style="font-size: 0.85rem; color: var(--text-secondary);">2026-06-14 --:--:--</span>
+        <button class="btn btn-danger" id="btn-modal-delete" style="padding: 0.4rem 1rem; font-size: 0.8rem;">Delete Log</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-content">
+      <div>&copy; 2026 SASTA CCTV. Built with style and utility.</div>
+    </div>
+  </footer>
+
+  <script src="/js/monitor.js"></script>
+</body>
+</html>
