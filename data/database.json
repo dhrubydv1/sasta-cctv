@@ -14,6 +14,11 @@
       "id": "1781454923019xkhhw",
       "username": "autotest98231",
       "passwordHash": "$2b$10$lZItraVZgvlqE.W4dHdEZeODYsjeiuoSAKXi/y/XmFlyaePlXRjMG"
+    },
+    {
+      "id": "1786462677503nat78",
+      "username": "demo",
+      "passwordHash": "$2b$10$AtyyCv5P499S5l1X5/wBcO8A7eBDL4S8PFnvs0MolPKyQewjp0A8m"
     }
   ],
   "alerts": [

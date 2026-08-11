@@ -4,7 +4,11 @@ const bcrypt = require('bcryptjs');
 
 const DB_DIR = path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DB_DIR, 'database.json');
-const UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads', 'alerts');
+// Alert images are deliberately kept outside the public directory.  They are
+// served only after the requesting user has been authorised by the API.
+const UPLOADS_DIR = path.join(DB_DIR, 'alerts');
+const LEGACY_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads', 'alerts');
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
 // In-memory data store
 let db = {
@@ -44,7 +48,9 @@ function init() {
 // Save database to file
 function save() {
   try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
+    const tempFile = `${DB_FILE}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(db, null, 2), 'utf8');
+    fs.renameSync(tempFile, DB_FILE);
   } catch (err) {
     console.error('Failed to save database.json:', err);
   }
@@ -61,7 +67,7 @@ async function createUser(username, password) {
   const passwordHash = await bcrypt.hash(password, salt);
 
   const newUser = {
-    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+    id: `${Date.now()}${Math.random().toString(36).slice(2, 7)}`,
     username: username.toLowerCase().trim(),
     passwordHash
   };
@@ -93,43 +99,50 @@ async function verifyUser(username, password) {
 
 // Alert / Motion Detection Event Management
 function addAlert(userId, cameraName, base64Image) {
-  const alertId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
-  let imagePath = '';
-
-  if (base64Image) {
-    try {
-      // Expecting a base64 string, clean it if it contains headers
-      const matches = base64Image.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
-      let ext = 'jpg';
-      let data = base64Image;
-
-      if (matches && matches.length === 3) {
-        ext = matches[1];
-        data = matches[2];
-      }
-
-      const fileName = `alert_${userId}_${alertId}.${ext}`;
-      const fullPath = path.join(UPLOADS_DIR, fileName);
-
-      fs.writeFileSync(fullPath, Buffer.from(data, 'base64'));
-      imagePath = `/uploads/alerts/${fileName}`;
-    } catch (err) {
-      console.error('Error saving base64 alert image:', err);
-    }
+  if (typeof base64Image !== 'string') {
+    throw new Error('Image content is required');
   }
+  const matches = base64Image.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!matches) throw new Error('Only JPEG, PNG, and WebP image uploads are supported');
+
+  const imageBuffer = Buffer.from(matches[2], 'base64');
+  if (!imageBuffer.length || imageBuffer.length > MAX_IMAGE_BYTES) {
+    throw new Error('Image must be between 1 byte and 2 MB');
+  }
+
+  const alertId = `${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
+  const extension = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+  const imageFile = `alert_${userId}_${alertId}.${extension}`;
+  fs.writeFileSync(path.join(UPLOADS_DIR, imageFile), imageBuffer, { flag: 'wx' });
 
   const newAlert = {
     id: alertId,
     userId,
-    cameraName: cameraName || 'Unknown Camera',
+    cameraName: typeof cameraName === 'string' && cameraName.trim()
+      ? cameraName.trim().slice(0, 64)
+      : 'Unknown Camera',
     timestamp: new Date().toISOString(),
-    imagePath
+    imageFile
   };
 
   db.alerts.push(newAlert);
   save();
 
   return newAlert;
+}
+
+function getAlertFilePath(userId, alertId) {
+  const alert = db.alerts.find(a => a.id === alertId && a.userId === userId);
+  if (!alert) return null;
+
+  // imagePath supports alert records created before private storage was added.
+  const imageFile = alert.imageFile || path.basename(alert.imagePath || '');
+  if (!/^[a-zA-Z0-9_.-]+$/.test(imageFile)) return null;
+
+  const privatePath = path.join(UPLOADS_DIR, imageFile);
+  if (fs.existsSync(privatePath)) return privatePath;
+  const legacyPath = path.join(LEGACY_UPLOADS_DIR, imageFile);
+  return fs.existsSync(legacyPath) ? legacyPath : null;
 }
 
 function getAlertsForUser(userId) {
@@ -143,11 +156,14 @@ function deleteAlert(userId, alertId) {
   if (index !== -1) {
     const alert = db.alerts[index];
     // Delete physical file if it exists
-    if (alert.imagePath) {
-      const fullPath = path.join(__dirname, '..', 'public', alert.imagePath);
-      if (fs.existsSync(fullPath)) {
+    if (alert.imageFile || alert.imagePath) {
+      const imageFile = alert.imageFile || path.basename(alert.imagePath);
+      const fullPath = path.join(UPLOADS_DIR, imageFile);
+      const legacyPath = path.join(LEGACY_UPLOADS_DIR, imageFile);
+      const fileToDelete = fs.existsSync(fullPath) ? fullPath : legacyPath;
+      if (fs.existsSync(fileToDelete)) {
         try {
-          fs.unlinkSync(fullPath);
+          fs.unlinkSync(fileToDelete);
         } catch (err) {
           console.error('Failed to delete physical file:', err);
         }
@@ -169,5 +185,6 @@ module.exports = {
   verifyUser,
   addAlert,
   getAlertsForUser,
+  getAlertFilePath,
   deleteAlert
 };

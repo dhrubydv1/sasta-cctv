@@ -130,8 +130,7 @@ function connectSocket() {
   socket.on('connect', () => {
     console.log('Connected to signaling server');
     socket.emit('register-device', {
-      type: 'monitor',
-      userId
+      type: 'monitor'
     });
   });
 
@@ -251,11 +250,16 @@ function renderCameraSelectionGrid(cameras) {
   cameras.forEach(cam => {
     const card = document.createElement('div');
     card.className = 'camera-card';
-    card.innerHTML = `
-      <div class="camera-card-icon">📹</div>
-      <div class="camera-card-name">${cam.cameraName}</div>
-      <div style="font-size: 0.75rem; color: var(--accent-neon);">● ACTIVE</div>
-    `;
+    const icon = document.createElement('div');
+    icon.className = 'camera-card-icon';
+    icon.textContent = '📹';
+    const name = document.createElement('div');
+    name.className = 'camera-card-name';
+    name.textContent = cam.cameraName;
+    const status = document.createElement('div');
+    status.style.cssText = 'font-size: 0.75rem; color: var(--accent-neon);';
+    status.textContent = '● ACTIVE';
+    card.append(icon, name, status);
     card.addEventListener('click', () => initiateStreaming(cam.socketId, cam.cameraName));
     container.appendChild(card);
   });
@@ -421,16 +425,26 @@ function renderAlertList() {
     const date = new Date(alert.timestamp);
     const dateStr = date.toLocaleTimeString() + ' - ' + date.toLocaleDateString();
 
-    item.innerHTML = `
-      <div class="alert-thumbnail">
-        <img src="${alert.imagePath || 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22 style=%22background:%23000;%22><text y=%22.9em%22 font-size=%2280%22 fill=%22red%22>⚠️</text></svg>'}" alt="Alert Thumbnail">
-      </div>
-      <div class="alert-info">
-        <span class="alert-camera">${alert.cameraName}</span>
-        <span class="alert-time">${dateStr}</span>
-      </div>
-      <button class="alert-delete-btn" title="Delete event">&times;</button>
-    `;
+    const thumbnail = document.createElement('div');
+    thumbnail.className = 'alert-thumbnail';
+    const image = document.createElement('img');
+    image.src = alert.imagePath || '';
+    image.alt = 'Alert thumbnail';
+    thumbnail.appendChild(image);
+    const info = document.createElement('div');
+    info.className = 'alert-info';
+    const camera = document.createElement('span');
+    camera.className = 'alert-camera';
+    camera.textContent = alert.cameraName;
+    const timestamp = document.createElement('span');
+    timestamp.className = 'alert-time';
+    timestamp.textContent = dateStr;
+    info.append(camera, timestamp);
+    const remove = document.createElement('button');
+    remove.className = 'alert-delete-btn';
+    remove.title = 'Delete event';
+    remove.textContent = '×';
+    item.append(thumbnail, info, remove);
 
     // Click handler to open screenshot modal
     item.addEventListener('click', (e) => {
