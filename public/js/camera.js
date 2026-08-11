@@ -249,8 +249,7 @@ function connectSocket() {
     console.log('Connected to signaling server');
     socket.emit('register-device', {
       type: 'camera',
-      cameraName,
-      userId
+      cameraName
     });
   });
 
@@ -370,7 +369,7 @@ function startMotionDetection() {
   const procCtx = processingCanvas.getContext('2d');
 
   motionIntervalId = setInterval(() => {
-    if (!isStreaming || video.paused || video.ended) return;
+    if (!isStreaming || video.paused || video.ended || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
 
     // Set output overlay canvas resolution
     outputCanvas.width = video.videoWidth;

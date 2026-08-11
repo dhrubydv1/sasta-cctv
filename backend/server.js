@@ -8,28 +8,39 @@ const db = require('./db');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  maxHttpBufferSize: 50 * 1024 * 1024 // 50MB limit for base64 uploads via socket if needed
+  maxHttpBufferSize: 2 * 1024 * 1024
 });
 
 const PORT = process.env.PORT || 3050;
 
 // Session Configuration
 const sessionMiddleware = session({
-  secret: 'sasta-cctv-super-secret-key-123',
+  secret: process.env.SESSION_SECRET || 'development-only-change-this-secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
     maxAge: 24 * 60 * 60 * 1000, // 1 day
     httpOnly: true,
-    sameSite: 'lax'
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
   }
 });
 
 app.use(sessionMiddleware);
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '3mb' }));
+app.use(express.urlencoded({ extended: true, limit: '3mb' }));
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  next();
+});
 
 // Serve Static Files
+// Legacy versions stored snapshots under public/uploads. Keep those old URLs
+// from bypassing the authenticated alert-image endpoint.
+app.use('/uploads/alerts', (_req, res) => res.status(404).end());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Share session with Socket.io
@@ -107,8 +118,14 @@ app.get('/api/devices/active-cameras', requireAuth, (req, res) => {
 
 // Alert APIs
 app.get('/api/alerts', requireAuth, (req, res) => {
-  const alerts = db.getAlertsForUser(req.session.user.id);
+  const alerts = db.getAlertsForUser(req.session.user.id).map(toAlertResponse);
   res.json({ alerts });
+});
+
+app.get('/api/alerts/:id/image', requireAuth, (req, res) => {
+  const filePath = db.getAlertFilePath(req.session.user.id, req.params.id);
+  if (!filePath) return res.status(404).json({ error: 'Alert image not found' });
+  return res.sendFile(filePath);
 });
 
 app.post('/api/alerts/upload', requireAuth, (req, res) => {
@@ -119,15 +136,16 @@ app.post('/api/alerts/upload', requireAuth, (req, res) => {
 
   try {
     const alert = db.addAlert(req.session.user.id, cameraName, image);
+    const responseAlert = toAlertResponse(alert);
     
     // Broadcast motion alert to monitors in real-time
     const userRoom = `user_${req.session.user.id}`;
-    io.to(userRoom).emit('motion-alert', alert);
+    io.to(userRoom).emit('motion-alert', responseAlert);
 
-    return res.json({ success: true, alert });
+    return res.json({ success: true, alert: responseAlert });
   } catch (err) {
     console.error('Failed to upload alert:', err);
-    return res.status(500).json({ error: 'Failed to upload alert' });
+    return res.status(400).json({ error: err.message || 'Failed to upload alert' });
   }
 });
 
@@ -142,6 +160,13 @@ app.delete('/api/alerts/:id', requireAuth, (req, res) => {
 // Real-time Socket.io Communications
 const activeCameras = {}; // socket.id -> { userId, cameraName, socketId }
 
+const toAlertResponse = (alert) => ({
+  id: alert.id,
+  cameraName: alert.cameraName,
+  timestamp: alert.timestamp,
+  imagePath: `/api/alerts/${encodeURIComponent(alert.id)}/image`
+});
+
 const getCamerasForUser = (userId) => {
   return Object.values(activeCameras)
     .filter(cam => cam.userId === userId)
@@ -150,29 +175,27 @@ const getCamerasForUser = (userId) => {
 
 io.on('connection', (socket) => {
   const sessionUser = socket.request.session ? socket.request.session.user : null;
-  
-  // Handshake verification
   if (!sessionUser) {
-    // If socket isn't authenticated via session, wait for explicit authentication token/id
-    // or disconnect after a timeout.
-    // For ease, we will allow them to pass the userId during registration if session cookie isn't available
+    socket.disconnect(true);
+    return;
   }
 
-  socket.on('register-device', ({ type, cameraName, userId }) => {
-    // Determine user ID from session or payload
-    const finalUserId = sessionUser ? sessionUser.id : userId;
-    if (!finalUserId) {
-      socket.emit('error', 'Authentication required to register device');
+  socket.on('register-device', ({ type, cameraName } = {}) => {
+    if (type !== 'camera' && type !== 'monitor') {
+      socket.emit('app-error', 'Invalid device type');
       return;
     }
 
+    const finalUserId = sessionUser.id;
     socket.userId = finalUserId;
     socket.deviceType = type;
     const userRoom = `user_${finalUserId}`;
     socket.join(userRoom);
 
     if (type === 'camera') {
-      socket.cameraName = cameraName || 'Unknown Camera';
+      socket.cameraName = typeof cameraName === 'string' && cameraName.trim()
+        ? cameraName.trim().slice(0, 64)
+        : 'Unknown Camera';
       activeCameras[socket.id] = {
         userId: finalUserId,
         cameraName: socket.cameraName,
@@ -191,8 +214,8 @@ io.on('connection', (socket) => {
   });
 
   // Relay WebRTC signalling messages (offer, answer, ice-candidate)
-  socket.on('webrtc-signal', ({ targetSocketId, signalData }) => {
-    if (!socket.userId) return;
+  socket.on('webrtc-signal', ({ targetSocketId, signalData } = {}) => {
+    if (!socket.userId || !targetSocketId || !signalData) return;
     
     // Safety check: ensure target exists and belongs to the same user
     const targetSocket = io.sockets.sockets.get(targetSocketId);
@@ -205,8 +228,8 @@ io.on('connection', (socket) => {
   });
 
   // Relay Siren / Alarm commands
-  socket.on('trigger-siren', ({ targetSocketId, action }) => {
-    if (!socket.userId) return;
+  socket.on('trigger-siren', ({ targetSocketId, action } = {}) => {
+    if (!socket.userId || !targetSocketId || !['start', 'stop'].includes(action)) return;
 
     const targetSocket = io.sockets.sockets.get(targetSocketId);
     if (targetSocket && targetSocket.userId === socket.userId && targetSocket.deviceType === 'camera') {
