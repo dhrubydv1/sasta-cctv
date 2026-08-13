@@ -22,6 +22,7 @@ async function init() {
   const session = await protectPage();
   if (session && session.loggedIn) {
     userId = session.user.id;
+    window.CCTV_USER_ID = userId;
   }
 
   // Load existing alert logs

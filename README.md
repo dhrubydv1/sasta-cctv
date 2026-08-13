@@ -117,20 +117,53 @@ PORT=8080 SESSION_SECRET='replace-with-a-long-random-secret' npm start
 | `SESSION_SECRET` | development fallback | Secret used to sign login sessions. Set a unique, long random value in production. |
 | `NODE_ENV` | unset | Set to `production` behind HTTPS so session cookies are marked secure. |
 
+## Vercel deployment
+
+The repository includes a Vercel serverless backend in `api/index.js`. It uses
+Neon Postgres for account/alert metadata, a **private** Vercel Blob store for
+snapshots, signed HTTP-only JWT cookies for sessions, and Ably for realtime
+camera presence and WebRTC signalling. This replaces the local filesystem,
+in-memory sessions, and Socket.IO server that are used by `npm start`.
+
+1. Create a Neon database through the Vercel Marketplace and add its connection
+   string as `DATABASE_URL`.
+2. Run [db/schema.sql](db/schema.sql) in Neon’s SQL editor.
+3. In the Vercel project Storage tab, create a **private** Blob store. Vercel
+   adds `BLOB_READ_WRITE_TOKEN` to the project environment automatically.
+4. Create an Ably app and add a server API key as `ABLY_API_KEY`. Do not expose
+   this key in browser code or use an `ABLY_API_KEY` prefixed with `NEXT_PUBLIC`.
+5. Generate a random secret of at least 32 characters and add it as
+   `SESSION_SECRET` for Production, Preview, and Development.
+6. Import the repository into Vercel, or deploy with `vercel --prod` after
+   linking the project. Vercel uses `vercel.json` to route `/api/*` to the
+   serverless backend and serve the browser application from `public/`.
+
+Use `.env.example` as a checklist. Never commit a real `.env.local` file or any
+of these credentials. The deployed cookie is `Secure`, `HttpOnly`, and
+`SameSite=Lax`, so the Vercel production URL must be accessed over HTTPS.
+
+The old `backend/server.js` remains for local-only development. It is not the
+Vercel production backend and must not be used to run a second deployment
+against the Vercel database without a separate migration.
+
 ## Project layout
 
 ```text
-backend/server.js       Express, sessions, APIs, and Socket.IO signalling
-backend/db.js           JSON persistence and private alert-image storage
+api/index.js            Vercel serverless API, JWT auth, alert routes
+backend/server.js       Legacy local Express + Socket.IO server
+backend/db.js           Legacy JSON persistence for local server
+backend/vercel-db.js    Neon Postgres persistence layer
+backend/vercel-auth.js  Signed cookie authentication layer
+backend/realtime.js     Ably token, presence, and alert publishing service
+db/schema.sql           Neon database schema to run once before deployment
 data/database.json      Local user and alert metadata database
 data/alerts/            Private motion snapshot files (created at runtime)
 public/                 Browser pages, styles, and client-side camera/monitor code
 ```
 
-User accounts and alert metadata are stored in `data/database.json`. This is a
-simple local JSON store suitable for development or small private deployments;
-use a managed database and a proper session store before scaling to multiple
-server instances.
+For local mode, user accounts and alert metadata are stored in
+`data/database.json`. The Vercel deployment instead stores them in Neon
+Postgres, with private snapshot files in Vercel Blob.
 
 ## Security notes
 
@@ -139,8 +172,8 @@ server instances.
   account.
 - Alert images are stored outside the public static directory and are served
   only through an authenticated API endpoint.
-- The default in-memory session store is not appropriate for a production,
-  multi-process deployment.
+- Vercel sessions use signed, short-lived HTTP-only cookies; never reuse the
+  development fallback secret in production.
 - Run behind HTTPS, set `SESSION_SECRET`, and do not expose the demo account
   around real camera feeds.
 
