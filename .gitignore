@@ -1,4 +1,6 @@
 node_modules/
 npm-debug.log*
 .env
+.env.local
+.vercel
 data/alerts/

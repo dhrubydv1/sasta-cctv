@@ -26,6 +26,7 @@ async function init() {
   const session = await protectPage();
   if (session && session.loggedIn) {
     userId = session.user.id;
+    window.CCTV_USER_ID = userId;
     // Suggest default camera name based on browser/OS
     const os = navigator.userAgent.includes('Windows') ? 'PC' : 
                navigator.userAgent.includes('Android') ? 'Android' : 
