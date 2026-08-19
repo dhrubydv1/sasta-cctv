@@ -70,23 +70,188 @@ account above, or register your own account.
 For a realistic test, use two physical devices. A single device generally
 cannot use its camera and reliably monitor the same live stream at once.
 
-## Device and browser compatibility
+## Vercel deployment (production)
 
-The app works on devices that provide a compatible browser and hardware. It is
-not possible to guarantee every device model because browser support, camera
-drivers, permissions, battery policies, and network rules differ.
+The repository includes a Vercel serverless backend in `api/index.js`. It uses
+Neon Postgres for account/alert metadata, a **private** Vercel Blob store for
+snapshots, signed HTTP-only JWT cookies for sessions, and Ably for realtime
+camera presence and WebRTC signalling.
 
-| Device | Supported browsers | Notes |
+### Step 1 — Push to GitHub
+
+```bash
+git add -A
+git commit -m "Deploy to production"
+git push origin main
+```
+
+### Step 2 — Create a Neon database
+
+1. Go to [console.neon.tech](https://console.neon.tech) and create a project.
+2. Open the **SQL Editor** and run `db/schema.sql`.
+3. Copy the connection string — it looks like:
+   ```
+   postgresql://neondb_owner:xxxxx@ep-xxx.neon.tech/neondb?sslmode=require
+   ```
+
+### Step 3 — Create a Vercel Blob store
+
+1. In your Vercel project dashboard, go to **Storage** → **Create Store** → **Blob**.
+2. Choose **Private** (alert images must stay private).
+3. Vercel automatically adds `BLOB_READ_WRITE_TOKEN` to your environment.
+
+### Step 4 — Create an Ably account
+
+1. Go to [ably.com](https://ably.com) and create an app.
+2. Go to **Settings → API Keys** and copy the **Full API Key**.
+3. **Never expose this key in browser code** — it's only used server-side.
+
+### Step 5 — Set environment variables
+
+In Vercel dashboard → **Settings → Environment Variables**, add:
+
+| Variable | Value | Where |
+|----------|-------|-------|
+| `DATABASE_URL` | Neon connection string | Production, Preview, Development |
+| `ABLY_API_KEY` | Ably full API key | Production, Preview, Development |
+| `SESSION_SECRET` | Random 32+ char string | Production, Preview, Development |
+
+Generate a session secret:
+```bash
+openssl rand -hex 32
+```
+
+### Step 6 — Deploy
+
+```bash
+# Via Vercel CLI (first time links the project)
+vercel --prod
+
+# Or just push to GitHub — auto-deploys if connected
+git push origin main
+```
+
+### Step 7 — Verify
+
+| Endpoint | Method | Expected |
+|----------|--------|----------|
+| `https://your-app.vercel.app/` | GET | Landing page |
+| `https://your-app.vercel.app/api/auth/session` | GET | `{"loggedIn":false}` |
+| `https://your-app.vercel.app/api/alerts` | GET | `401` (unauthenticated) |
+
+## Configuration
+
+### Local development
+
+The server listens on port `3050` by default.
+
+```bash
+PORT=8080 SESSION_SECRET='replace-with-a-long-random-secret' npm start
+```
+
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| Android phones/tablets | Current Chrome, Edge, Firefox | Good camera/monitor option. Keep the browser in the foreground for best reliability. |
-| iPhone/iPad | Current Safari | Works on supported iOS/iPadOS versions; Safari may pause background tabs and requires user permission for media/audio. |
-| Windows/macOS/Linux | Current Chrome, Edge, Firefox, Safari on macOS | Works with built-in or USB webcams and microphones. |
-| Chromebooks | Current Chrome | Works when the device camera/microphone is available to Chrome. |
-| Older browsers, feature phones, most smart-TV browsers | Not supported | Usually lack the required WebRTC or camera APIs. |
+| `PORT` | `3050` | HTTP port for the application. |
+| `SESSION_SECRET` | development fallback | Secret used to sign login sessions. Set a unique, long random value in production. |
+| `NODE_ENV` | unset | Set to `production` behind HTTPS so session cookies are marked secure. |
 
-Camera and microphone access requires either `http://localhost` during local
-development or HTTPS in a deployed environment. Browsers will block access on
-an ordinary `http://` public address.
+### Vercel production
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | Neon Postgres connection string |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob access token (auto-added) |
+| `ABLY_API_KEY` | Ably server API key for realtime |
+| `SESSION_SECRET` | JWT signing secret (min 32 chars) |
+
+See `.env.example` for a checklist. Never commit `.env.local` or any credentials.
+
+## Architecture
+
+### Local mode (`npm start`)
+
+```
+browser → Express + Socket.IO → data/database.json + data/alerts/
+```
+
+### Vercel mode (production)
+
+```
+browser → api/index.js (serverless)
+              ├── Neon Postgres    (users, alerts metadata)
+              ├── Vercel Blob      (private alert images)
+              └── Ably             (camera presence, WebRTC signalling)
+```
+
+### How the pieces connect
+
+```
+Camera device (camera.html)
+  ├── Loads Ably SDK from CDN
+  ├── realtime.js → /api/realtime-token → Ably (scoped token)
+  ├── Registers in Ably presence channel
+  ├── Motion detected → POST /api/alerts/upload
+  │   ├── Saves image to Vercel Blob (private)
+  │   ├── Saves metadata to Neon Postgres
+  │   └── Publishes alert via Ably channel
+  └── WebRTC signalling via Ably messages
+
+Monitor device (monitor.html)
+  ├── Loads Ably SDK from CDN
+  ├── Gets camera list from Ably presence
+  ├── Receives motion alerts via Ably channel subscription
+  ├── Fetches alert list from /api/alerts (Neon)
+  ├── Fetches alert images from /api/alerts/:id/image (Vercel Blob)
+  └── WebRTC peer connection to camera (P2P)
+```
+
+## Project layout
+
+```
+api/index.js              Vercel serverless API (Express, JWT auth, alert routes)
+backend/server.js         Local Express + Socket.IO dev server
+backend/db.js             Local JSON file persistence (dev only)
+backend/vercel-db.js      Neon Postgres queries (production)
+backend/vercel-auth.js    Signed cookie JWT authentication (production)
+backend/realtime.js       Ably token, presence, and alert publishing (production)
+db/schema.sql             Neon database schema (run once)
+public/                   Browser pages, styles, and client-side code
+public/js/auth.js         Session management
+public/js/realtime.js     Ably adapter (browser-side)
+public/js/monitor.js      Monitor logic (WebRTC, alerts)
+public/js/camera.js       Camera logic (streaming, motion detection)
+test/db.test.js           Database unit tests (23 tests)
+test/api.test.js          API integration tests (26 tests)
+scripts/clean-test-data.js Utility to purge test data from local database
+data/database.json        Local user/alert metadata (dev only)
+data/alerts/              Local alert image files (dev only)
+```
+
+## Testing
+
+Run the full test suite:
+
+```bash
+npm test
+```
+
+This runs Node's built-in test runner across `test/db.test.js` (23 unit tests)
+and `test/api.test.js` (26 integration tests).
+
+### Test coverage
+
+| Area | Tests | What's tested |
+|------|-------|---------------|
+| `db.js` | 23 | User CRUD, password hashing, alert CRUD, file path resolution, input validation |
+| API routes | 26 | Auth flow (register, login, logout, session), 401 enforcement, alert upload/list/delete, security headers |
+
+### Cleaning test data
+
+Test runs create temporary users in `data/database.json`. Clean them with:
+
+```bash
+node scripts/clean-test-data.js
+```
 
 ## Networking and remote viewing
 
@@ -103,93 +268,38 @@ TURN server and replace the `iceServers` settings in:
 The application server only handles login, device discovery, alerts, and WebRTC
 signalling; it does not relay the video stream by itself.
 
-## Configuration
+## Device and browser compatibility
 
-The server listens on port `3050` by default.
-
-```bash
-PORT=8080 SESSION_SECRET='replace-with-a-long-random-secret' npm start
-```
-
-| Variable | Default | Purpose |
+| Device | Supported browsers | Notes |
 | --- | --- | --- |
-| `PORT` | `3050` | HTTP port for the application. |
-| `SESSION_SECRET` | development fallback | Secret used to sign login sessions. Set a unique, long random value in production. |
-| `NODE_ENV` | unset | Set to `production` behind HTTPS so session cookies are marked secure. |
+| Android phones/tablets | Current Chrome, Edge, Firefox | Good camera/monitor option. Keep the browser in the foreground. |
+| iPhone/iPad | Current Safari | Safari may pause background tabs and requires user permission. |
+| Windows/macOS/Linux | Current Chrome, Edge, Firefox, Safari on macOS | Works with built-in or USB webcams. |
+| Chromebooks | Current Chrome | Works when device camera/mic is available. |
+| Older browsers, feature phones, smart-TV browsers | Not supported | Usually lack required WebRTC or camera APIs. |
 
-## Vercel deployment
-
-The repository includes a Vercel serverless backend in `api/index.js`. It uses
-Neon Postgres for account/alert metadata, a **private** Vercel Blob store for
-snapshots, signed HTTP-only JWT cookies for sessions, and Ably for realtime
-camera presence and WebRTC signalling. This replaces the local filesystem,
-in-memory sessions, and Socket.IO server that are used by `npm start`.
-
-1. Create a Neon database through the Vercel Marketplace and add its connection
-   string as `DATABASE_URL`.
-2. Run [db/schema.sql](db/schema.sql) in Neon’s SQL editor.
-3. In the Vercel project Storage tab, create a **private** Blob store. Vercel
-   adds `BLOB_READ_WRITE_TOKEN` to the project environment automatically.
-4. Create an Ably app and add a server API key as `ABLY_API_KEY`. Do not expose
-   this key in browser code or use an `ABLY_API_KEY` prefixed with `NEXT_PUBLIC`.
-5. Generate a random secret of at least 32 characters and add it as
-   `SESSION_SECRET` for Production, Preview, and Development.
-6. Import the repository into Vercel, or deploy with `vercel --prod` after
-   linking the project. Vercel uses `vercel.json` to route `/api/*` to the
-   serverless backend and serve the browser application from `public/`.
-
-Use `.env.example` as a checklist. Never commit a real `.env.local` file or any
-of these credentials. The deployed cookie is `Secure`, `HttpOnly`, and
-`SameSite=Lax`, so the Vercel production URL must be accessed over HTTPS.
-
-The old `backend/server.js` remains for local-only development. It is not the
-Vercel production backend and must not be used to run a second deployment
-against the Vercel database without a separate migration.
-
-## Project layout
-
-```text
-api/index.js            Vercel serverless API, JWT auth, alert routes
-backend/server.js       Legacy local Express + Socket.IO server
-backend/db.js           Legacy JSON persistence for local server
-backend/vercel-db.js    Neon Postgres persistence layer
-backend/vercel-auth.js  Signed cookie authentication layer
-backend/realtime.js     Ably token, presence, and alert publishing service
-db/schema.sql           Neon database schema to run once before deployment
-data/database.json      Local user and alert metadata database
-data/alerts/            Private motion snapshot files (created at runtime)
-public/                 Browser pages, styles, and client-side camera/monitor code
-```
-
-For local mode, user accounts and alert metadata are stored in
-`data/database.json`. The Vercel deployment instead stores them in Neon
-Postgres, with private snapshot files in Vercel Blob.
-
-## Security notes
-
-- Passwords are hashed with bcrypt.
-- Cameras, monitors, alerts, and snapshot images are scoped to the signed-in
-  account.
-- Alert images are stored outside the public static directory and are served
-  only through an authenticated API endpoint.
-- Vercel sessions use signed, short-lived HTTP-only cookies; never reuse the
-  development fallback secret in production.
-- Run behind HTTPS, set `SESSION_SECRET`, and do not expose the demo account
-  around real camera feeds.
+Camera and microphone access requires `http://localhost` during development or
+HTTPS in production. Browsers block access on plain `http://` public addresses.
 
 ## Development commands
 
 ```bash
-npm start       # start the server
-npm run dev     # restart the server automatically when backend files change
-npm test        # run Node's test runner
+npm start       # start the local server
+npm run dev     # restart automatically when backend files change
+npm test        # run the test suite
 npm audit       # check dependency advisories
 ```
 
-## Current limitations / roadmap
+## Security notes
 
-The current project is workable for browser-based monitoring, but these are not
-implemented yet:
+- Passwords are hashed with bcrypt.
+- Cameras, monitors, alerts, and snapshot images are scoped to the signed-in account.
+- Alert images are stored outside the public directory and served only through authenticated API endpoints.
+- Vercel sessions use signed, short-lived HTTP-only cookies.
+- All frontend API calls include `credentials: 'same-origin'` for reliable session handling.
+- Never reuse the development `SESSION_SECRET` fallback in production.
+
+## Current limitations / roadmap
 
 - Native Android/iOS application and background recording
 - Web push notifications when the monitor is closed
@@ -197,7 +307,6 @@ implemented yet:
 - Motion schedules, zones, and person/pet detection
 - Camera selection, torch, optical zoom, and device-specific controls
 - TURN configuration UI and production deployment automation
-- Automated end-to-end browser tests
 
 ## License
 
