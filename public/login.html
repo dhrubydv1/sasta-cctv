@@ -101,7 +101,7 @@
           } else {
             // Determine dynamically
             try {
-              const countRes = await fetch('/api/devices/active-cameras');
+              const countRes = await fetch('/api/devices/active-cameras', { credentials: 'same-origin' });
               const countData = await countRes.json();
               const target = countData.count === 0 ? '/camera.html?autostart=true' : '/monitor.html';
               setTimeout(() => {

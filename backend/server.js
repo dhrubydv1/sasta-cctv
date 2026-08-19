@@ -63,6 +63,7 @@ app.post('/api/auth/register', async (req, res) => {
     req.session.user = user;
     return res.json({ success: true, user });
   } catch (err) {
+    console.error('Registration error:', err);
     return res.status(400).json({ error: err.message });
   }
 });
@@ -81,6 +82,7 @@ app.post('/api/auth/login', async (req, res) => {
     req.session.user = user;
     return res.json({ success: true, user });
   } catch (err) {
+    console.error('Login error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

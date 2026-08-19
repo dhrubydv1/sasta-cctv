@@ -136,8 +136,8 @@ function getAlertFilePath(userId, alertId) {
   if (!alert) return null;
 
   // imagePath supports alert records created before private storage was added.
-  const imageFile = alert.imageFile || path.basename(alert.imagePath || '');
-  if (!/^[a-zA-Z0-9_.-]+$/.test(imageFile)) return null;
+  const imageFile = alert.imageFile || (alert.imagePath ? path.basename(alert.imagePath) : '');
+  if (!imageFile || !/^[a-zA-Z0-9_.-]+$/.test(imageFile)) return null;
 
   const privatePath = path.join(UPLOADS_DIR, imageFile);
   if (fs.existsSync(privatePath)) return privatePath;

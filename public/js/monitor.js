@@ -379,7 +379,7 @@ function backToCameraList() {
 // Fetch historical alert logs from database
 async function fetchAlertLogs() {
   try {
-    const res = await fetch('/api/alerts');
+    const res = await fetch('/api/alerts', { credentials: 'same-origin' });
     const data = await res.json();
     if (res.ok) {
       alertsCache = data.alerts;
@@ -490,7 +490,8 @@ async function deleteActiveAlert() {
 async function deleteAlertItem(id) {
   try {
     const res = await fetch(`/api/alerts/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'same-origin'
     });
     
     if (res.ok) {

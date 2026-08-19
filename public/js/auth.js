@@ -2,7 +2,7 @@
 
 async function checkSession() {
   try {
-    const res = await fetch('/api/auth/session');
+    const res = await fetch('/api/auth/session', { credentials: 'same-origin' });
     const data = await res.json();
     return data;
   } catch (err) {
@@ -63,13 +63,15 @@ async function updateNavbar() {
 
 async function handleLogout() {
   try {
-    const res = await fetch('/api/auth/logout', { method: 'POST' });
+    const res = await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
     const data = await res.json();
     if (data.success) {
       window.location.href = '/';
     }
   } catch (err) {
     console.error('Logout request failed:', err);
+    // Redirect even on network failure to clear local state
+    window.location.href = '/';
   }
 }
 
@@ -86,7 +88,7 @@ async function redirectIfLoggedIn() {
   const session = await checkSession();
   if (session.loggedIn) {
     try {
-      const res = await fetch('/api/devices/active-cameras');
+      const res = await fetch('/api/devices/active-cameras', { credentials: 'same-origin' });
       const data = await res.json();
       if (data.count === 0) {
         window.location.href = '/camera.html?autostart=true';

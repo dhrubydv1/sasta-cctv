@@ -523,6 +523,7 @@ async function triggerMotionAlert() {
     const res = await fetch('/api/alerts/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({
         cameraName,
         image: dataUrl
