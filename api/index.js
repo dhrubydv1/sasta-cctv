@@ -50,7 +50,14 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/auth/logout', (_req, res) => { auth.clearSession(res); res.json({ success: true }); });
+app.post('/api/auth/logout', (_req, res) => {
+  try {
+    auth.clearSession(res);
+  } catch (error) {
+    console.error('Logout error:', error);
+  }
+  res.json({ success: true });
+});
 app.get('/api/auth/session', (req, res) => {
   const user = auth.getUser(req);
   return res.json(user ? { loggedIn: true, user: { id: user.id, username: user.username } } : { loggedIn: false });
