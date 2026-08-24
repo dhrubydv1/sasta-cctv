@@ -4,3 +4,5 @@ npm-debug.log*
 .env.local
 .vercel
 data/alerts/
+data/database.json
+VoiceForge/
