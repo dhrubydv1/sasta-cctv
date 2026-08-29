@@ -6,3 +6,11 @@ npm-debug.log*
 data/alerts/
 data/database.json
 VoiceForge/
+
+# OS junk
+.DS_Store
+
+# Local agent tooling (not part of the application)
+.claude/
+.agents/
+skills-lock.json

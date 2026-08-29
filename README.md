@@ -20,18 +20,17 @@ desktop webcam as a camera.
 - Push-to-talk audio, remote siren, digital zoom, and night-vision filter
 - Responsive UI for mobile and desktop browsers
 
-## Demo account
+## Accounts
 
-Anyone evaluating this local/demo deployment can sign in with:
+There is no shipped default account, and no credentials are published in this
+repository. Start the server, open the app, and use **Register** to create your
+own account. Every camera, monitor, alert, and snapshot is scoped to the
+account that created it.
 
-| Field | Value |
-| --- | --- |
-| Username | `demo` |
-| Password | `REMOVED-DEMO-PASSWORD` |
-
-This account is intentionally public. Do **not** use it for real cameras or
-private spaces. Create a separate account for personal use and change/remove
-the demo account before making a production deployment public.
+If you need a throwaway account for evaluation, register one locally and delete
+it when you are done. Never reuse a password from anywhere else, and do not
+create shared or well-known credentials on a deployment that is reachable from
+the internet.
 
 ## Requirements
 
@@ -48,8 +47,8 @@ npm install
 npm start
 ```
 
-Open [http://localhost:3050](http://localhost:3050). Log in with the demo
-account above, or register your own account.
+Open [http://localhost:3050](http://localhost:3050) and select **Register** to
+create an account.
 
 ### Use it as a camera
 
