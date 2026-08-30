@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const session = require('express-session');
+const FileStore = require('session-file-store')(session);
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const db = require('./db');
@@ -16,6 +17,9 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3050;
 const isProduction = process.env.NODE_ENV === 'production';
+const DATA_DIR = process.env.SASTA_CCTV_DATA_DIR
+  ? path.resolve(process.env.SASTA_CCTV_DATA_DIR)
+  : path.join(__dirname, '..', 'data');
 
 if (isProduction && !process.env.SESSION_SECRET) {
   throw new Error('SESSION_SECRET must be set when NODE_ENV=production');
@@ -27,6 +31,10 @@ if (isProduction) app.set('trust proxy', 1);
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'development-only-change-this-secret',
   name: 'sasta_cctv_session',
+  store: new FileStore({
+    path: path.join(DATA_DIR, 'sessions'),
+    logFn: () => {}
+  }),
   resave: false,
   saveUninitialized: false,
   cookie: {

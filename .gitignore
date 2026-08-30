@@ -5,6 +5,7 @@ npm-debug.log*
 .vercel
 data/alerts/
 data/database.json
+data/sessions/
 # Camera snapshots are private user data and must never be committed.
 public/uploads/
 VoiceForge/

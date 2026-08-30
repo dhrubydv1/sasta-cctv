@@ -101,12 +101,12 @@ browser → Express + Socket.IO → data/database.json + data/alerts/
 
 ```
 backend/server.js         Local Express + Socket.IO dev server
-backend/db.js             Local JSON file persistence (dev only)
+backend/db.js             Local JSON file persistence
 public/                   Browser pages, styles, and client-side code
 public/js/auth.js         Session management
 public/js/monitor.js      Monitor logic (WebRTC, alerts)
 public/js/camera.js       Camera logic (streaming, motion detection)
-test/db.test.js           Database unit tests (23 tests)
+test/db.test.js           Database unit tests (24 tests)
 test/api.test.js          API integration tests (26 tests)
 scripts/clean-test-data.js Utility to purge test data from local database
 data/database.json        Local user/alert metadata (dev only)
@@ -128,7 +128,7 @@ and `test/api.test.js` (26 integration tests).
 
 | Area | Tests | What's tested |
 |------|-------|---------------|
-| `db.js` | 23 | User CRUD, password hashing, alert CRUD, file path resolution, input validation |
+| `db.js` | 24 | User CRUD, password hashing, alert CRUD, file path resolution, input validation |
 | API routes | 26 | Auth flow (register, login, logout, session), 401 enforcement, alert upload/list/delete, security headers |
 
 ### Cleaning test data
@@ -189,9 +189,9 @@ npm audit       # check dependency advisories
 
 The app can run on a single long-running Node.js server with HTTPS and a
 persistent writable disk mounted for `data/`. It is not compatible with
-serverless hosts, and the built-in JSON database and in-memory session store do
-not support multiple application instances. Configure an authenticated TURN
-server before relying on remote viewing across restrictive networks.
+serverless hosts, and its JSON database and file-backed session store do not
+support multiple application instances. Configure an authenticated TURN server
+before relying on remote viewing across restrictive networks.
 
 ## Current limitations / roadmap
 
