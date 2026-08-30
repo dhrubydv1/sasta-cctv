@@ -6,7 +6,11 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node --watch backend/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "doctor": "node scripts/doctor.js",
+    "check": "npm run doctor",
+    "setup:unix": "bash scripts/setup.sh",
+    "setup:windows": "powershell -ExecutionPolicy Bypass -File scripts/setup.ps1"
   },
   "keywords": [],
   "author": "",

@@ -40,6 +40,33 @@ the internet.
 - Two devices or two separate browser sessions signed into the same account
 - Internet/LAN access between devices for remote use
 
+## Quick Installation
+
+Git clones never run this project automatically. After cloning, explicitly run
+the setup assistant for your platform. It checks Git, Node.js, npm, project
+dependencies, and local configuration. It only installs system software or
+project dependencies after you answer `Y` or `y`.
+
+```bash
+# macOS or Linux
+bash scripts/setup.sh
+
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -File scripts/setup.ps1
+```
+
+Run a read-only environment report at any time:
+
+```bash
+npm run doctor
+```
+
+The exact command to start SASTA CCTV is:
+
+```bash
+npm start
+```
+
 ## Quick start
 
 ```bash
