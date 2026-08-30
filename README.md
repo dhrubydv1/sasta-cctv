@@ -69,75 +69,6 @@ create an account.
 For a realistic test, use two physical devices. A single device generally
 cannot use its camera and reliably monitor the same live stream at once.
 
-## Vercel deployment (production)
-
-The repository includes a Vercel serverless backend in `api/index.js`. It uses
-Neon Postgres for account/alert metadata, a **private** Vercel Blob store for
-snapshots, signed HTTP-only JWT cookies for sessions, and Ably for realtime
-camera presence and WebRTC signalling.
-
-### Step 1 — Push to GitHub
-
-```bash
-git add -A
-git commit -m "Deploy to production"
-git push origin main
-```
-
-### Step 2 — Create a Neon database
-
-1. Go to [console.neon.tech](https://console.neon.tech) and create a project.
-2. Open the **SQL Editor** and run `db/schema.sql`.
-3. Copy the connection string — it looks like:
-   ```
-   postgresql://neondb_owner:xxxxx@ep-xxx.neon.tech/neondb?sslmode=require
-   ```
-
-### Step 3 — Create a Vercel Blob store
-
-1. In your Vercel project dashboard, go to **Storage** → **Create Store** → **Blob**.
-2. Choose **Private** (alert images must stay private).
-3. Vercel automatically adds `BLOB_READ_WRITE_TOKEN` to your environment.
-
-### Step 4 — Create an Ably account
-
-1. Go to [ably.com](https://ably.com) and create an app.
-2. Go to **Settings → API Keys** and copy the **Full API Key**.
-3. **Never expose this key in browser code** — it's only used server-side.
-
-### Step 5 — Set environment variables
-
-In Vercel dashboard → **Settings → Environment Variables**, add:
-
-| Variable | Value | Where |
-|----------|-------|-------|
-| `DATABASE_URL` | Neon connection string | Production, Preview, Development |
-| `ABLY_API_KEY` | Ably full API key | Production, Preview, Development |
-| `SESSION_SECRET` | Random 32+ char string | Production, Preview, Development |
-
-Generate a session secret:
-```bash
-openssl rand -hex 32
-```
-
-### Step 6 — Deploy
-
-```bash
-# Via Vercel CLI (first time links the project)
-vercel --prod
-
-# Or just push to GitHub — auto-deploys if connected
-git push origin main
-```
-
-### Step 7 — Verify
-
-| Endpoint | Method | Expected |
-|----------|--------|----------|
-| `https://your-app.vercel.app/` | GET | Landing page |
-| `https://your-app.vercel.app/api/auth/session` | GET | `{"loggedIn":false}` |
-| `https://your-app.vercel.app/api/alerts` | GET | `401` (unauthenticated) |
-
 ## Configuration
 
 ### Local development
@@ -154,16 +85,8 @@ PORT=8080 SESSION_SECRET='replace-with-a-long-random-secret' npm start
 | `SESSION_SECRET` | development fallback | Secret used to sign login sessions. Set a unique, long random value in production. |
 | `NODE_ENV` | unset | Set to `production` behind HTTPS so session cookies are marked secure. |
 
-### Vercel production
-
-| Variable | Purpose |
-|----------|---------|
-| `DATABASE_URL` | Neon Postgres connection string |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob access token (auto-added) |
-| `ABLY_API_KEY` | Ably server API key for realtime |
-| `SESSION_SECRET` | JWT signing secret (min 32 chars) |
-
-See `.env.example` for a checklist. Never commit `.env.local` or any credentials.
+Copy `.env.example` to `.env.local` when you need to customize the port or
+session secret. Never commit `.env.local` or any credentials.
 
 ## Architecture
 
@@ -173,50 +96,13 @@ See `.env.example` for a checklist. Never commit `.env.local` or any credentials
 browser → Express + Socket.IO → data/database.json + data/alerts/
 ```
 
-### Vercel mode (production)
-
-```
-browser → api/index.js (serverless)
-              ├── Neon Postgres    (users, alerts metadata)
-              ├── Vercel Blob      (private alert images)
-              └── Ably             (camera presence, WebRTC signalling)
-```
-
-### How the pieces connect
-
-```
-Camera device (camera.html)
-  ├── Loads Ably SDK from CDN
-  ├── realtime.js → /api/realtime-token → Ably (scoped token)
-  ├── Registers in Ably presence channel
-  ├── Motion detected → POST /api/alerts/upload
-  │   ├── Saves image to Vercel Blob (private)
-  │   ├── Saves metadata to Neon Postgres
-  │   └── Publishes alert via Ably channel
-  └── WebRTC signalling via Ably messages
-
-Monitor device (monitor.html)
-  ├── Loads Ably SDK from CDN
-  ├── Gets camera list from Ably presence
-  ├── Receives motion alerts via Ably channel subscription
-  ├── Fetches alert list from /api/alerts (Neon)
-  ├── Fetches alert images from /api/alerts/:id/image (Vercel Blob)
-  └── WebRTC peer connection to camera (P2P)
-```
-
 ## Project layout
 
 ```
-api/index.js              Vercel serverless API (Express, JWT auth, alert routes)
 backend/server.js         Local Express + Socket.IO dev server
 backend/db.js             Local JSON file persistence (dev only)
-backend/vercel-db.js      Neon Postgres queries (production)
-backend/vercel-auth.js    Signed cookie JWT authentication (production)
-backend/realtime.js       Ably token, presence, and alert publishing (production)
-db/schema.sql             Neon database schema (run once)
 public/                   Browser pages, styles, and client-side code
 public/js/auth.js         Session management
-public/js/realtime.js     Ably adapter (browser-side)
 public/js/monitor.js      Monitor logic (WebRTC, alerts)
 public/js/camera.js       Camera logic (streaming, motion detection)
 test/db.test.js           Database unit tests (23 tests)
@@ -294,7 +180,7 @@ npm audit       # check dependency advisories
 - Passwords are hashed with bcrypt.
 - Cameras, monitors, alerts, and snapshot images are scoped to the signed-in account.
 - Alert images are stored outside the public directory and served only through authenticated API endpoints.
-- Vercel sessions use signed, short-lived HTTP-only cookies.
+- Sessions use HTTP-only cookies.
 - All frontend API calls include `credentials: 'same-origin'` for reliable session handling.
 - Never reuse the development `SESSION_SECRET` fallback in production.
 
