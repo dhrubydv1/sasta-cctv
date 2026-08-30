@@ -2,13 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-const DB_DIR = path.join(__dirname, '..', 'data');
+const DB_DIR = process.env.SASTA_CCTV_DATA_DIR
+  ? path.resolve(process.env.SASTA_CCTV_DATA_DIR)
+  : path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DB_DIR, 'database.json');
 // Alert images are deliberately kept outside the public directory.  They are
 // served only after the requesting user has been authorised by the API.
 const UPLOADS_DIR = path.join(DB_DIR, 'alerts');
-const LEGACY_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads', 'alerts');
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/;
 
 // In-memory data store
 let db = {
@@ -58,7 +60,15 @@ function save() {
 
 // User Management
 async function createUser(username, password) {
-  const existingUser = findUserByUsername(username);
+  if (typeof username !== 'string' || !USERNAME_PATTERN.test(username.trim().toLowerCase())) {
+    throw new Error('Username must be 3–32 characters and use only letters, numbers, dots, hyphens, or underscores');
+  }
+  if (typeof password !== 'string' || password.length < 6 || password.length > 128) {
+    throw new Error('Password must be between 6 and 128 characters');
+  }
+
+  const normalizedUsername = username.trim().toLowerCase();
+  const existingUser = findUserByUsername(normalizedUsername);
   if (existingUser) {
     throw new Error('Username already exists');
   }
@@ -68,7 +78,7 @@ async function createUser(username, password) {
 
   const newUser = {
     id: `${Date.now()}${Math.random().toString(36).slice(2, 7)}`,
-    username: username.toLowerCase().trim(),
+    username: normalizedUsername,
     passwordHash
   };
 
@@ -140,9 +150,7 @@ function getAlertFilePath(userId, alertId) {
   if (!imageFile || !/^[a-zA-Z0-9_.-]+$/.test(imageFile)) return null;
 
   const privatePath = path.join(UPLOADS_DIR, imageFile);
-  if (fs.existsSync(privatePath)) return privatePath;
-  const legacyPath = path.join(LEGACY_UPLOADS_DIR, imageFile);
-  return fs.existsSync(legacyPath) ? legacyPath : null;
+  return fs.existsSync(privatePath) ? privatePath : null;
 }
 
 function getAlertsForUser(userId) {
@@ -158,12 +166,10 @@ function deleteAlert(userId, alertId) {
     // Delete physical file if it exists
     if (alert.imageFile || alert.imagePath) {
       const imageFile = alert.imageFile || path.basename(alert.imagePath);
-      const fullPath = path.join(UPLOADS_DIR, imageFile);
-      const legacyPath = path.join(LEGACY_UPLOADS_DIR, imageFile);
-      const fileToDelete = fs.existsSync(fullPath) ? fullPath : legacyPath;
-      if (fs.existsSync(fileToDelete)) {
+      const filePath = path.join(UPLOADS_DIR, imageFile);
+      if (fs.existsSync(filePath)) {
         try {
-          fs.unlinkSync(fileToDelete);
+          fs.unlinkSync(filePath);
         } catch (err) {
           console.error('Failed to delete physical file:', err);
         }

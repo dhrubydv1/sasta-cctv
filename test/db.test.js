@@ -8,10 +8,9 @@ const TEST_DB_DIR = path.join(__dirname, '..', 'data', 'test');
 const TEST_DB_FILE = path.join(TEST_DB_DIR, 'database.json');
 const TEST_UPLOADS_DIR = path.join(TEST_DB_DIR, 'alerts');
 
-// Stub the module paths before requiring db.js
-// We'll manipulate the db module by requiring it after setting up our test environment
-
-let db;
+// The database module reads this before it is loaded, so test data is never
+// written to the application's real data directory.
+process.env.SASTA_CCTV_DATA_DIR = TEST_DB_DIR;
 
 before(() => {
   // Ensure test directories exist
@@ -58,6 +57,15 @@ describe('Database Module (db.js)', () => {
 
       const user = await testDb.createUser(`TestUser2_${ts}`, 'password123');
       assert.strictEqual(user.username, `testuser2_${ts}`);
+    });
+
+    it('should reject usernames with unsupported characters', async () => {
+      const testDb = require('../backend/db');
+
+      await assert.rejects(
+        () => testDb.createUser('<img src=x onerror=alert(1)>', 'password123'),
+        /Username must be 3–32 characters/
+      );
     });
   });
 

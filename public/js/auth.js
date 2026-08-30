@@ -19,30 +19,33 @@ async function updateNavbar() {
   if (!navActions || !navLinksContainer) return session;
 
   if (session.loggedIn) {
-    // Logged In navbar
-    navLinksContainer.innerHTML = `
-      <a class="nav-link" id="link-home" href="/">Home</a>
-      <a class="nav-link" id="link-monitor" href="/monitor.html">Web Monitor</a>
-      <a class="nav-link" id="link-camera" href="/camera.html">Camera Console</a>
-    `;
-    
-    navActions.innerHTML = `
-      <div class="user-badge">
-        <div class="user-avatar">${session.user.username.charAt(0).toUpperCase()}</div>
-        <span style="font-size: 0.9rem; font-weight: 500;">${session.user.username}</span>
-      </div>
-      <button class="btn btn-secondary" onclick="handleLogout()" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Logout</button>
-    `;
+    navLinksContainer.replaceChildren(
+      createNavLink('link-home', '/', 'Home'),
+      createNavLink('link-monitor', '/monitor.html', 'Web Monitor'),
+      createNavLink('link-camera', '/camera.html', 'Camera Console')
+    );
+
+    const badge = document.createElement('div');
+    badge.className = 'user-badge';
+    const avatar = document.createElement('div');
+    avatar.className = 'user-avatar';
+    avatar.textContent = session.user.username.charAt(0).toUpperCase();
+    const name = document.createElement('span');
+    name.style.cssText = 'font-size: 0.9rem; font-weight: 500;';
+    name.textContent = session.user.username;
+    badge.append(avatar, name);
+    const logout = document.createElement('button');
+    logout.className = 'btn btn-secondary';
+    logout.style.cssText = 'padding: 0.5rem 1rem; font-size: 0.85rem;';
+    logout.textContent = 'Logout';
+    logout.addEventListener('click', handleLogout);
+    navActions.replaceChildren(badge, logout);
   } else {
-    // Logged Out navbar
-    navLinksContainer.innerHTML = `
-      <a class="nav-link" id="link-home" href="/">Home</a>
-    `;
-    
-    navActions.innerHTML = `
-      <a class="btn btn-secondary" href="/login.html" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">Login</a>
-      <a class="btn btn-primary" href="/register.html" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">Sign Up</a>
-    `;
+    navLinksContainer.replaceChildren(createNavLink('link-home', '/', 'Home'));
+    navActions.replaceChildren(
+      createNavLink('', '/login.html', 'Login', 'btn btn-secondary'),
+      createNavLink('', '/register.html', 'Sign Up', 'btn btn-primary')
+    );
   }
 
   // Highlight active link
@@ -59,6 +62,16 @@ async function updateNavbar() {
   }
 
   return session;
+}
+
+function createNavLink(id, href, label, className = 'nav-link') {
+  const link = document.createElement('a');
+  link.id = id;
+  link.href = href;
+  link.className = className;
+  if (className.startsWith('btn ')) link.style.cssText = 'padding: 0.5rem 1.25rem; font-size: 0.85rem;';
+  link.textContent = label;
+  return link;
 }
 
 async function handleLogout() {

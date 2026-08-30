@@ -2,8 +2,11 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const session = require('express-session');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const db = require('./db');
+
+require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
 const app = express();
 const server = http.createServer(app);
@@ -12,17 +15,25 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3050;
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction && !process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET must be set when NODE_ENV=production');
+}
+
+if (isProduction) app.set('trust proxy', 1);
 
 // Session Configuration
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'development-only-change-this-secret',
+  name: 'sasta_cctv_session',
   resave: false,
   saveUninitialized: false,
   cookie: {
     maxAge: 24 * 60 * 60 * 1000, // 1 day
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production'
+    secure: isProduction
   }
 });
 
@@ -34,13 +45,31 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'same-origin');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
   next();
 });
 
+// Browsers send an Origin header for cross-site form/fetch requests. Reject a
+// mismatched value before any state-changing API route to provide CSRF defence
+// in addition to the SameSite session cookie.
+app.use('/api', (req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const origin = req.get('origin');
+  if (!origin || origin === `${req.protocol}://${req.get('host')}`) return next();
+  return res.status(403).json({ error: 'Cross-origin requests are not allowed' });
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  skip: (req) => req.method !== 'POST',
+  message: { error: 'Too many authentication attempts. Please try again later.' }
+});
+app.use('/api/auth', authLimiter);
+
 // Serve Static Files
-// Legacy versions stored snapshots under public/uploads. Keep those old URLs
-// from bypassing the authenticated alert-image endpoint.
-app.use('/uploads/alerts', (_req, res) => res.status(404).end());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Share session with Socket.io
@@ -51,11 +80,14 @@ io.use((socket, next) => {
 // Authentication APIs
 app.post('/api/auth/register', async (req, res) => {
   const { username, password } = req.body;
-  if (!username || !password) {
+  if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
-  if (username.length < 3 || password.length < 6) {
-    return res.status(400).json({ error: 'Username must be at least 3 characters and password at least 6 characters' });
+  if (!/^[a-z0-9._-]{3,32}$/i.test(username.trim())) {
+    return res.status(400).json({ error: 'Username must be 3–32 characters and use only letters, numbers, dots, hyphens, or underscores' });
+  }
+  if (password.length < 6 || password.length > 128) {
+    return res.status(400).json({ error: 'Password must be between 6 and 128 characters' });
   }
 
   try {
@@ -70,7 +102,7 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
-  if (!username || !password) {
+  if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
 
@@ -92,7 +124,7 @@ app.post('/api/auth/logout', (req, res) => {
     if (err) {
       return res.status(500).json({ error: 'Could not log out' });
     }
-    res.clearCookie('connect.sid');
+    res.clearCookie('sasta_cctv_session');
     return res.json({ success: true });
   });
 });

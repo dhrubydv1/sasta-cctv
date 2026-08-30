@@ -82,11 +82,12 @@ PORT=8080 SESSION_SECRET='replace-with-a-long-random-secret' npm start
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `PORT` | `3050` | HTTP port for the application. |
-| `SESSION_SECRET` | development fallback | Secret used to sign login sessions. Set a unique, long random value in production. |
+| `SESSION_SECRET` | development fallback | Secret used to sign login sessions. It is required when `NODE_ENV=production`. |
 | `NODE_ENV` | unset | Set to `production` behind HTTPS so session cookies are marked secure. |
 
 Copy `.env.example` to `.env.local` when you need to customize the port or
-session secret. Never commit `.env.local` or any credentials.
+session secret; it is loaded automatically at startup. Never commit `.env.local`
+or any credentials.
 
 ## Architecture
 
@@ -183,6 +184,14 @@ npm audit       # check dependency advisories
 - Sessions use HTTP-only cookies.
 - All frontend API calls include `credentials: 'same-origin'` for reliable session handling.
 - Never reuse the development `SESSION_SECRET` fallback in production.
+
+## Deployment status
+
+The app can run on a single long-running Node.js server with HTTPS and a
+persistent writable disk mounted for `data/`. It is not compatible with
+serverless hosts, and the built-in JSON database and in-memory session store do
+not support multiple application instances. Configure an authenticated TURN
+server before relying on remote viewing across restrictive networks.
 
 ## Current limitations / roadmap
 

@@ -3,8 +3,12 @@ const assert = require('node:assert');
 const http = require('http');
 const express = require('express');
 const session = require('express-session');
+const fs = require('fs');
+const path = require('path');
 
 // We'll build a lightweight test server using the same route logic
+const TEST_DB_DIR = path.join(__dirname, '..', 'data', 'api-test');
+process.env.SASTA_CCTV_DATA_DIR = TEST_DB_DIR;
 const db = require('../backend/db');
 
 const app = express();
@@ -179,7 +183,10 @@ before(async () => {
 });
 
 after(() => {
-  return new Promise((resolve) => server.close(resolve));
+  return new Promise((resolve) => server.close(() => {
+    fs.rmSync(TEST_DB_DIR, { recursive: true, force: true });
+    resolve();
+  }));
 });
 
 describe('Auth API Routes', () => {
